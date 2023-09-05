@@ -1,4 +1,7 @@
 [workspace]
-members = [
-    "arith"
-]
+members = ["arith"]
+
+[workspace.dependencies]
+pest = {version = "2.7.3", features = ["pretty-print"]}
+pest_derive = "2.7.3"
+thiserror = "1.0.48"

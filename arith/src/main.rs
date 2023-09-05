@@ -9,7 +9,7 @@ use thiserror::Error;
 #[grammar = "arith.pest"]
 struct ArithParser;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 enum AST {
     True,
     False,
@@ -81,32 +81,38 @@ fn is_val(v: &AST) -> bool {
 
 fn eval_ast(v: AST) -> Result<AST, ArithError> {
     match v {
-        v if is_val(&v) => Ok(v),
+        v if is_val(&v) => Ok(v), // B-Value
         AST::IfThenElse(cond, then, els) => {
             let cond = eval_ast(*cond)?;
             match cond {
-                AST::True => eval_ast(*then),
-                AST::False => eval_ast(*els),
+                AST::True => eval_ast(*then), // B-IfTrue
+                AST::False => eval_ast(*els), // B-IfFalse
                 v => Err(ArithError::UnknownRuleError(v)),
             }
         }
-        AST::Succ(v) => Ok(AST::Succ(Box::new(eval_ast(*v)?))),
+        AST::Succ(v) => {
+            let v = eval_ast(*v)?;
+            match v {
+                v if is_numeric_val(&v) => Ok(AST::Succ(Box::new(v))), // B-Succ
+                v => Err(ArithError::UnknownRuleError(v)),
+            }
+        }
         AST::Pred(v) => {
             let v = eval_ast(*v)?;
             match v {
-                AST::Zero => Ok(AST::Zero),
-                AST::Succ(v) if is_numeric_val(&*v) => Ok(*v),
+                AST::Zero => Ok(AST::Zero),                    // B-PredZero
+                AST::Succ(v) if is_numeric_val(&*v) => Ok(*v), // B-PredSucc
                 v => Err(ArithError::UnknownRuleError(v)),
             }
         }
-        AST::IsZero(v) => 
-        {
+        AST::IsZero(v) => {
             let v = eval_ast(*v)?;
             match v {
-            AST::Zero => Ok(AST::True),
-            v if is_numeric_val(&v) => Ok(AST::False),
-            v => Err(ArithError::UnknownRuleError(v)),
-        }},
+                AST::Zero => Ok(AST::True),                           // B-IsZeroZero
+                AST::Succ(v) if is_numeric_val(&v) => Ok(AST::False), // B-IsZeroSucc
+                v => Err(ArithError::UnknownRuleError(v)),
+            }
+        }
         v => Err(ArithError::UnknownRuleError(v)),
     }
 }
@@ -126,6 +132,15 @@ impl std::fmt::Display for ArithError {
     }
 }
 
+fn try_parse(input: &str) -> Result<AST, ArithError> {
+    let input = ArithParser::parse(Rule::Input, input)
+        .map_err(|e| ArithError::ParseError(e))?
+        .next()
+        .ok_or(ArithError::EmptyPairsError)?;
+    let input = AST::try_from(input)?;
+    Ok(input)
+}
+
 fn main() -> Result<(), ArithError> {
     let input = {
         let mut buf = String::new();
@@ -134,13 +149,48 @@ fn main() -> Result<(), ArithError> {
             .expect("Failed to read input");
         buf.trim_end().to_owned()
     };
-    let input = ArithParser::parse(Rule::Input, &input)
-        .map_err(|e| ArithError::ParseError(e))?
-        .next()
-        .ok_or(ArithError::EmptyPairsError)?;
-    let input = AST::try_from(input)?;
+    let input = try_parse(input.as_str())?;
     println!("Input: {:?}", input);
     let output = eval_ast(input)?;
     println!("Output: {:?}", output);
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_parse() {
+        let input = "if iszero pred succ 0 then true else false";
+        let input = try_parse(input).unwrap();
+        assert_eq!(
+            input,
+            AST::IfThenElse(
+                Box::new(AST::IsZero(Box::new(AST::Pred(Box::new(AST::Succ(
+                    Box::new(AST::Zero)
+                )))))),
+                Box::new(AST::True),
+                Box::new(AST::False)
+            )
+        );
+    }
+
+    #[test]
+    fn test_numeric_ops() {
+        let input = "pred pred succ succ succ 0";
+        let input = try_parse(input).unwrap();
+        let output = eval_ast(input).unwrap();
+        assert_eq!(
+            output,
+            AST::Succ(Box::new(AST::Zero))
+        );
+    }
+
+    #[test]
+    fn test_eval_if_else() {
+        let input = "if iszero succ 0 then true else false";
+        let input = try_parse(input).unwrap();
+        let output = eval_ast(input).unwrap();
+        assert_eq!(output, AST::False);
+    }
 }
