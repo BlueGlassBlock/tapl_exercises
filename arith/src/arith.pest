@@ -1,0 +1,22 @@
+WHITESPACE = _{" "}
+
+Input = _{ SOI ~ Term ~ EOI }
+
+Term = {
+    Bracket
+    | Literal
+    | IfThenElse
+    | Pred
+    | Succ
+    | IsZero
+}
+
+Bracket = _{"(" ~ Term ~ ")"}
+IfThenElse = {"if" ~ Term ~ "then" ~ Term ~ "else" ~ Term}
+Pred = {"pred" ~ Term}
+Succ = {"succ" ~ Term}
+IsZero = {"iszero" ~ Term}
+Literal = _{True | False | Zero}
+True = {"true"}
+False = {"false"}
+Zero = {"0"}
