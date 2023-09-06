@@ -117,6 +117,28 @@ fn eval_ast(v: AST) -> Result<AST, ArithError> {
     }
 }
 
+fn arith_size(v: &AST) -> u128 {
+    match v {
+        AST::True | AST::False | AST::Zero => 1,
+        AST::Succ(v) | AST::Pred(v) | AST::IsZero(v) => 1 + arith_size(v),
+        AST::IfThenElse(cond, then, els) => {
+            1 + arith_size(cond) + arith_size(then) + arith_size(els)
+        }
+    }
+}
+
+fn arith_depth(v: &AST) -> u128 {
+    match v {
+        AST::True | AST::False | AST::Zero => 1,
+        AST::Succ(v) | AST::Pred(v) | AST::IsZero(v) => 1 + arith_depth(v),
+        AST::IfThenElse(cond, then, els) => {
+            1 + arith_depth(cond)
+                .max(arith_depth(then))
+                .max(arith_depth(els))
+        }
+    }
+}
+
 #[derive(Debug, Error)]
 enum ArithError {
     ParseError(pest::error::Error<Rule>),
@@ -151,6 +173,11 @@ fn main() -> Result<(), ArithError> {
     };
     let input = try_parse(input.as_str())?;
     println!("Input: {:?}", input);
+    println!(
+        "Depth: {}, Size: {}",
+        arith_depth(&input),
+        arith_size(&input)
+    );
     let output = eval_ast(input)?;
     println!("Output: {:?}", output);
     Ok(())
@@ -180,10 +207,7 @@ mod tests {
         let input = "pred pred succ succ succ 0";
         let input = try_parse(input).unwrap();
         let output = eval_ast(input).unwrap();
-        assert_eq!(
-            output,
-            AST::Succ(Box::new(AST::Zero))
-        );
+        assert_eq!(output, AST::Succ(Box::new(AST::Zero)));
     }
 
     #[test]
@@ -192,5 +216,15 @@ mod tests {
         let input = try_parse(input).unwrap();
         let output = eval_ast(input).unwrap();
         assert_eq!(output, AST::False);
+    }
+
+    #[test]
+    fn test_arith_size_and_depth() {
+        let input = "if iszero succ 0 then if iszero pred 0 then true else succ 0 else false";
+        let input = try_parse(input).unwrap();
+        let size = arith_size(&input);
+        assert_eq!(size, 12);
+        let depth = arith_depth(&input);
+        assert_eq!(depth, 5);
     }
 }
