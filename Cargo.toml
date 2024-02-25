@@ -1,7 +1,14 @@
 [workspace]
-members = ["arith"]
+members = [
+    "arith",
+    "pure_untyped",
+]
+resolver = "2"
 
 [workspace.dependencies]
-pest = {version = "2.7.3", features = ["pretty-print"]}
-pest_derive = "2.7.3"
-thiserror = "1.0.48"
+pest = {version = "2.7", features = ["pretty-print"]}
+pest_derive = "2.7"
+thiserror = "1.0"
+pest_typed = { version = "0.12", git = "https://github.com/theverydarkness/pest-typed" }
+pest_typed_derive = { version = "0.12", git = "https://github.com/theverydarkness/pest-typed" }
+clap = "4.5"

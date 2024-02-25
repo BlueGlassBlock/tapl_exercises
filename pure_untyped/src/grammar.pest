@@ -1,0 +1,27 @@
+WHITESPACE = _{ " " | "\n" | "\t" }
+
+ID = { LOWERCASE | "_" }
+
+Binder = { "/" }
+
+Input = _{
+    EOI
+  | Command ~ ";" ~ Input
+}
+
+Command = {
+  ID ~ Binder
+  | Term
+}
+
+AtomicTerm = {
+    ID
+  | "(" ~ Term ~ ")"
+}
+
+AppTerm = { AtomicTerm+ }
+
+Term = {
+  "lambda" ~ ID ~ "." ~ Term
+  | AppTerm 
+}
